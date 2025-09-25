@@ -1,0 +1,43 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openjdk-17-jdk git zip unzip wget python3-pip python3-setuptools python3-dev build-essential
+
+      - name: Install Python deps and Buildozer
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install cython==0.29.33 buildozer
+
+      - name: Install Android SDK & NDK
+        run: |
+          mkdir -p $HOME/Android/Sdk/cmdline-tools
+          cd $HOME/Android/Sdk
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline.zip
+          unzip -q cmdline.zip -d cmdline-tools
+          yes | $HOME/Android/Sdk/cmdline-tools/bin/sdkmanager --sdk_root=$HOME/Android/Sdk "platform-tools" "platforms;android-31" "build-tools;31.0.0" "ndk;25.1.8937393"
+          echo "ANDROIDSDK=$HOME/Android/Sdk" >> $GITHUB_ENV
+          echo "ANDROIDNDK=$HOME/Android/Sdk/ndk/25.1.8937393" >> $GITHUB_ENV
+          echo "PATH=$PATH:$HOME/Android/Sdk/cmdline-tools/bin:$HOME/Android/Sdk/platform-tools" >> $GITHUB_ENV
+
+      - name: Build with Buildozer
+        run: |
+          buildozer -v android debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: expenseapp-apk
+          path: bin/*.apk
